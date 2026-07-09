@@ -26,12 +26,12 @@ class TripRequest:
 class Activity:
     name: str
     category: str
-    estimated_cost: float
     lat: float
     long: float
-    opening_hours: str  # e.g. "09:00-17:00"
+    opening_hours: str  # e.g. "09:00-17:00", or "estimated: HH:MM-HH:MM" if guessed
     source: str
     trip_request_id: str
+    estimated_cost: Optional[float] = None  # filled in by Budget Agent (PRD Section 10), not Research
     id: str = field(default_factory=_new_id)
 
 
