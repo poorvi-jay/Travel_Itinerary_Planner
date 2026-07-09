@@ -127,8 +127,17 @@ def filter_by_budget(
         )
 
     notes = (
-        f"Budget feedback loop exhausted: only {len(best)} of a target "
-        f"{target} activities ({MIN_VIABLE_PER_DAY}/day) fit even after dropping "
+        f"Budget likely too low for {trip_request.destination}: only {len(best)} of a "
+        f"target {target} activities ({MIN_VIABLE_PER_DAY}/day) fit even after dropping "
         "the priciest category and raising the budget by 15%."
     )
+    # PRD Section 13: "ideally with a suggested minimum." Only meaningful if
+    # the reduced pool actually *has* enough candidates at some price — if it
+    # doesn't, this isn't a budget problem, it's a destination-coverage
+    # problem, and agents/research_agent.py's day-count-feasibility note
+    # covers that case instead so the two messages don't contradict.
+    if len(reduced_pool) >= target:
+        cheapest_target = sorted(reduced_pool, key=lambda a: costs.get(a.id, 0.0))[:target]
+        suggested_min = sum(costs.get(a.id, 0.0) for a in cheapest_target)
+        notes += f" A budget of at least ~${suggested_min:.2f} would likely cover a full itinerary here."
     return best, True, notes
