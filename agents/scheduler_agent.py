@@ -1,45 +1,51 @@
 """
-Scheduler Agent — Sprint 1 STUB.
+Scheduler Agent — Sprint 3.
 
-Real version (Sprint 3) splits into two independently-built/tested
-concerns per PRD Section 12:
-  1. Geographic clustering (group same-day activities by proximity)
-  2. Time-window constraint satisfaction (order within a day respecting
-     opening/closing hours)
-For the walking skeleton, this just dumps activities round-robin into
-Day 1 / Day 2 / ... with no clustering and no time-window logic, purely
-to prove the pipeline produces a day-by-day structure end-to-end.
+Real implementation, combining two independently-tested concerns per PRD
+Section 12:
+  1. Geographic clustering (agents/geo_clustering.py) — assign activities
+     to `trip_request.days` day-buckets by lat/long proximity.
+  2. Time-window scheduling (agents/day_scheduler.py) — order each day's
+     activities respecting opening_hours, using a category-based duration
+     heuristic, with a concrete "unreasonable zigzag" threshold (1.5x the
+     geographically optimal path length) that reorders for geography when
+     it can do so without breaking opening-hours feasibility.
+
+Itinerary status is "partial" (with explanatory notes) if any activity
+had to be dropped from a day for not fitting its opening-hours window, or
+if a day's route stayed zigzagged because reordering would have broken
+opening hours; "failed" only if there's nothing to schedule at all.
 """
-from models import Activity, TripRequest, Itinerary, DayPlan
+from __future__ import annotations
+
+from models import Activity, TripRequest, Itinerary
+from agents.geo_clustering import cluster_by_day
+from agents.day_scheduler import schedule_day
 
 
 def schedule(trip_request: TripRequest, activities: list[Activity]) -> Itinerary:
-    """
-    Sprint 1 STUB: round-robins activities across `trip_request.days`,
-    with an arbitrary fixed scheduled_time. No clustering, no
-    opening-hours checks.
+    if not activities:
+        return Itinerary(
+            trip_request_id=trip_request.id,
+            days=[{"day_number": i + 1, "activities": []} for i in range(trip_request.days)],
+            status="failed",
+            notes="No activities available to schedule.",
+        )
 
-    Real implementation (Sprint 3) must:
-      - cluster by lat/long per day (nearest-neighbor or basic clustering)
-      - order within each day respecting opening_hours (filter/sort)
-      - combine the two only after each is independently tested
-      - define and enforce a concrete "unreasonable zigzag" threshold
-    """
-    days = [DayPlan(day_number=i + 1, activities=[]) for i in range(trip_request.days)]
+    clusters = cluster_by_day(activities, trip_request.days)
 
-    for idx, activity in enumerate(activities):
-        day = days[idx % trip_request.days]
-        day.activities.append({
-            "activity_id": activity.id,
-            "scheduled_time": "10:00",  # placeholder, no real time logic yet
-        })
+    days = []
+    all_notes = []
+    for i, day_activities in enumerate(clusters):
+        day_schedule, notes = schedule_day(day_activities)
+        days.append({"day_number": i + 1, "activities": day_schedule})
+        all_notes.extend(f"Day {i + 1}: {note}" for note in notes)
 
-    status = "complete" if activities else "failed"
-    notes = "" if activities else "No activities available to schedule (stub)."
+    status = "partial" if all_notes else "complete"
 
     return Itinerary(
         trip_request_id=trip_request.id,
-        days=[{"day_number": d.day_number, "activities": d.activities} for d in days],
+        days=days,
         status=status,
-        notes=notes,
+        notes=" ".join(all_notes),
     )

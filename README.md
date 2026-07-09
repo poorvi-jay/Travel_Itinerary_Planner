@@ -1,6 +1,6 @@
 # Travel Itinerary Planner
 
-## Current status: Sprint 2 (in progress) — real Research + Budget Agents
+## Current status: Sprint 3 (in progress) — real Research, Budget, and Scheduler Agents
 
 | Piece | Status |
 |---|---|
@@ -9,7 +9,9 @@
 | `agents/llm_normalizer.py` | **Real** — Groq call that only categorizes + fills in missing hours (labeled `estimated:`); never invents names/coordinates/cost |
 | `agents/llm_cost_estimator.py` | **Real** — Groq call that gives a typical per-activity USD cost; Budget Agent falls back to a fixed per-category table if this is unavailable/fails |
 | `agents/budget_agent.py` | **Real** — greedy cheapest-first selection to fit `TripRequest.budget`, plus the PRD §11 feedback loop (round 1: drop most expensive category; round 2: raise ceiling 15%; still short after both → return best-effort set and flag itinerary "partial") |
-| `agents/scheduler_agent.py` | **Stub** — round-robins activities into days, no clustering, no opening-hours logic (Sprint 3) |
+| `agents/geo_clustering.py` | **Real** — k-means (scikit-learn) groups activities into `days` day-buckets by lat/long, then rebalances so k-means's occasional lopsided clusters don't leave a day empty |
+| `agents/day_scheduler.py` | **Real** — orders each day's activities against `opening_hours` using a category-based duration heuristic (no real duration data exists), drops activities that don't fit, and enforces a concrete "unreasonable zigzag" threshold (1.5x the geographically-nearest-neighbor path length) — swaps to the geographic order only if that doesn't drop anything the time-window order kept |
+| `agents/scheduler_agent.py` | **Real** — combines the two independently-tested pieces above per PRD §12; flags itinerary "partial" if anything got dropped or a zigzag couldn't be resolved |
 | `pipeline/pipeline.py` | Real wiring — chains the three agents and applies the Budget Agent's partial-itinerary flag; function boundaries match future ADK agent nodes |
 | `main.py` | Real CLI entrypoint |
 | `tests/golden_scenarios.py` + `test_pipeline_skeleton.py` | Real — 5 scenarios from PRD §17, pass via fallback path with no keys set |
@@ -53,9 +55,9 @@ python main.py --destination "Paris" --days 3 --budget 300 --json
 python tests/test_pipeline_skeleton.py
 ```
 
-## Next up (Sprint 3, per PRD)
+## Next up
 
-- Scheduler agent: geographic clustering (PRD §12) + time-window
-  constraint satisfaction against `opening_hours`, built and tested
-  independently before combining, plus a concrete "unreasonable zigzag"
-  threshold.
+- Swap the plain-Python pipeline wiring for real ADK orchestration (PRD §14).
+- Revisit the Research↔Budget feedback loop once ADK makes a true
+  bidirectional loop possible, instead of the current one-shot
+  drop-category/raise-ceiling passes.

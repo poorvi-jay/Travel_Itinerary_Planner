@@ -1,2 +1,4 @@
 requests>=2.31
 groq>=0.9
+numpy>=1.26
+scikit-learn>=1.4
